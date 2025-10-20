@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Privado con Códigos - Pusher</title>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 400px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ff4757;
+        }
+
+        .status-dot.connected {
+            background-color: #2ed573;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #667eea;
+        }
+
+        .button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+        }
+
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #666;
+            position: relative;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e9ecef;
+        }
+
+        .divider span {
+            background: white;
+            padding: 0 15px;
+        }
+
+        .code-display {
+            background: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .code-display h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .code-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+            letter-spacing: 5px;
+            margin: 10px 0;
+        }
+
+        .code-info {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .chat-interface {
+            display: none;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-messages {
+            height: 300px;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .message.own {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .message-content {
+            max-width: 70%;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .message.own .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message-header {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-bottom: 3px;
+        }
+
+        .message-text {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .message-time {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 3px;
+        }
+
+        .chat-input {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 20px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .chat-input input:focus {
+            border-color: #667eea;
+        }
+
+        .chat-input button {
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .system-message {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            margin: 10px 0;
+            padding: 8px;
+            background: #e3f2fd;
+            border-radius: 8px;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .success-message {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                width: 100%;
+                height: 100vh;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Chat Privado</h1>
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Desconectado</span>
+            </div>
+        </div>
+
+        <div class="content" id="mainContent">
+            <!-- Setup Form -->
+            <div id="setupForm">
+                <div class="form-group">
+                    <label>Pusher Key:</label>
+                    <input type="text" id="pusherKey" placeholder="Tu Pusher Key">
+                </div>
+                
+                <div class="form-group">
+                    <label>Cluster:</label>
+                    <input type="text" id="pusherCluster" placeholder="us2, eu, etc.">
+                </div>
+                
+                <div class="form-group">
+                    <label>Tu Nombre:</label>
+                    <input type="text" id="userName" placeholder="Tu nombre" value="Usuario">
+                </div>
+
+                <button class="button" onclick="createChannel()">🚀 Crear Canal</button>
+                
+                <div class="divider">
+                    <span>O</span>
+                </div>
+                
+                <div class="form-group">
+                    <label>Código del Canal:</label>
+                    <input type="text" id="channelCode" placeholder="123456" maxlength="6">
+                </div>
+                
+                <button class="button" onclick="joinChannel()">🔑 Unirse al Canal</button>
+            </div>
+
+            <!-- Channel Created Display -->
+            <div id="channelCreated" class="hidden">
+                <div class="code-display">
+                    <h3>🎉 Canal Creado</h3>
+                    <div class="code-number" id="generatedCode">123456</div>
+                    <div class="code-info">
+                        Comparte este código con la persona que quieres invitar
+                    </div>
+                </div>
+                
+                <div class="code-info" style="text-align: center; margin: 15px 0; padding: 10px; background: #e8f5e8; border-radius: 8px;">
+                    <strong>¡Importante!</strong><br>
+                    Haz clic en "Entrar al Chat" para conectarte y poder enviar mensajes
+                </div>
+                
+                <button class="button" onclick="connectToChannel()">💬 Entrar al Chat</button>
+                <button class="button" onclick="resetForm()" style="background: #6c757d; margin-top: 10px;">🔄 Crear Nuevo Canal</button>
+            </div>
+
+            <!-- Channel Joined Display -->
+            <div id="channelJoined" class="hidden">
+                <div class="success-message">
+                    ✅ Te has unido al canal exitosamente
+                </div>
+                
+                <div class="code-info" style="text-align: center; margin: 15px 0; padding: 10px; background: #e3f2fd; border-radius: 8px;">
+                    <strong>¡Importante!</strong><br>
+                    Ahora haz clic en "Entrar al Chat" para conectarte y poder enviar mensajes
+                </div>
+                
+                <button class="button" onclick="connectToChannel()">💬 Entrar al Chat</button>
+                <button class="button" onclick="resetForm()" style="background: #6c757d; margin-top: 10px;">🔄 Unirse a Otro Canal</button>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="chat-interface" id="chatInterface">
+            <div class="chat-header">
+                <div>
+                    <strong id="chatTitle">Chat Privado</strong>
+                    <div style="font-size: 12px; opacity: 0.8;" id="channelInfo"></div>
+                </div>
+                <button onclick="disconnectChat()" style="background: none; border: none; color: white; cursor: pointer;">❌</button>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="system-message">
+                    Bienvenido al chat privado. Los mensajes son seguros y solo visibles para los miembros del canal.
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Escribe tu mensaje..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration - Detecta automáticamente localhost o producción
+        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:3000'
+            : 'https://chat-channels-liart.vercel.app'; // ⚠️ Cambia esto por tu URL de Vercel
+        
+        let pusher = null;
+        let channel = null;
+        let isConnected = false;
+        let currentUser = '';
+        let currentChannelId = '';
+        let currentChannelCode = '';
+
+        function updateStatus(connected, message) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            statusDot.classList.toggle('connected', connected);
+            statusText.textContent = message;
+            isConnected = connected;
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.getElementById('mainContent').insertBefore(errorDiv, document.getElementById('mainContent').firstChild);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = message;
+            document.getElementById('mainContent').insertBefore(successDiv, document.getElementById('mainContent').firstChild);
+            
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        }
+
+        function addMessage(message, isOwn = false) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+            
+            const avatar = message.user_name ? message.user_name.charAt(0).toUpperCase() : '?';
+            const time = new Date(message.timestamp).toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">
+                    <div class="message-header">${message.user_name || 'Usuario'}</div>
+                    <div class="message-text">${message.text}</div>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = text;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function createChannel() {
+            const pusherKey = document.getElementById('pusherKey').value;
+            const pusherCluster = document.getElementById('pusherCluster').value;
+            const userName = document.getElementById('userName').value;
+
+            if (!pusherKey || !pusherCluster || !userName) {
+                showError('Por favor completa todos los campos');
+                return;
+            }
+
+            currentUser = userName;
+            updateStatus(false, 'Creando canal...');
+
+            try {
+                const response = await fetch(`${API_URL}/create-channel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userName,
+                        user_name: userName
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentChannelId = data.channelId;
+                    currentChannelCode = data.channelCode;
+                    
+                    document.getElementById('generatedCode').textContent = data.channelCode;
+                    document.getElementById('setupForm').classList.add('hidden');
+                    document.getElementById('channelCreated').classList.remove('hidden');
+                    
+                    showSuccess('Canal creado exitosamente');
+                } else {
+                    showError('Error al crear el canal: ' + data.error);
+                }
+            } catch (error) {
+                showError('Error de conexión: ' + error.message);
+            }
+        }
+
+        async function joinChannel() {
+            const pusherKey = document.getElementById('pusherKey').value;
+            const pusherCluster = document.getElementById('pusherCluster').value;
+            const userName = document.getElementById('userName').value;
+            const channelCode = document.getElementById('channelCode').value;
+
+            if (!pusherKey || !pusherCluster || !userName || !channelCode) {
+                showError('Por favor completa todos los campos');
+                return;
+            }
+
+            currentUser = userName;
+            updateStatus(false, 'Uniéndose al canal...');
+
+            try {
+                const response = await fetch(`${API_URL}/join-channel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        channelCode: channelCode,
+                        user_id: userName,
+                        user_name: userName
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentChannelId = data.channelId;
+                    currentChannelCode = channelCode;
+                    
+                    document.getElementById('setupForm').classList.add('hidden');
+                    document.getElementById('channelJoined').classList.remove('hidden');
+                    
+                    showSuccess('Te has unido al canal exitosamente');
+                } else {
+                    showError('Error al unirse al canal: ' + data.error);
+                }
+            } catch (error) {
+                showError('Error de conexión: ' + error.message);
+            }
+        }
+
+        async function connectToChannel() {
+            const pusherKey = document.getElementById('pusherKey').value;
+            const pusherCluster = document.getElementById('pusherCluster').value;
+
+            updateStatus(false, 'Conectando...');
+
+            // Disconnect previous connection
+            if (pusher) {
+                pusher.disconnect();
+            }
+
+            // Initialize Pusher
+            pusher = new Pusher(pusherKey, {
+                cluster: pusherCluster,
+                authEndpoint: `${API_URL}/pusher/auth`,
+                auth: {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    params: {
+                        user_id: currentUser,
+                        user_name: currentUser
+                    }
+                }
+            });
+
+            // Connection events
+            pusher.connection.bind('connected', () => {
+                console.log('🔌 Pusher conectado exitosamente');
+                console.log('📡 Socket ID:', pusher.connection.socket_id);
+                updateStatus(true, 'Conectado');
+                subscribeToChannel();
+                showChatInterface();
+            });
+
+            pusher.connection.bind('disconnected', () => {
+                console.log('🔌 Pusher desconectado');
+                updateStatus(false, 'Desconectado');
+            });
+
+            pusher.connection.bind('error', (error) => {
+                console.error('❌ Pusher error:', error);
+                updateStatus(false, 'Error de conexión');
+                showError('Error de conexión: ' + (error.error || error.message || 'Error desconocido'));
+            });
+        }
+
+        function subscribeToChannel() {
+            console.log('📢 Suscribiéndose al canal:', currentChannelId);
+            channel = pusher.subscribe(currentChannelId);
+            
+            channel.bind('pusher:subscription_succeeded', (data) => {
+                console.log('✅ Suscripción exitosa al canal');
+                console.log('👥 Miembros actuales:', data.members);
+                console.log('🔔 Ahora escuchando eventos chat-message...');
+                addSystemMessage(`✅ Conectado al canal privado. Miembros: ${Object.keys(data.members).length}`);
+            });
+
+            channel.bind('pusher:member_added', (member) => {
+                console.log('👤 Nuevo miembro:', member.info);
+                addSystemMessage(`👤 ${member.info.name} se unió al chat`);
+            });
+
+            channel.bind('pusher:member_removed', (member) => {
+                console.log('👋 Miembro salió:', member.info);
+                addSystemMessage(`👋 ${member.info.name} salió del chat`);
+            });
+
+            // Listen for chat messages
+            channel.bind('chat-message', (data) => {
+                console.log('📨 Mensaje recibido:', data);
+                console.log('👤 Usuario actual:', currentUser);
+                console.log('👤 Usuario del mensaje:', data.user_id);
+                
+                if (data.user_id !== currentUser) {
+                    console.log('✅ Mostrando mensaje de otro usuario');
+                    addMessage(data, false);
+                } else {
+                    console.log('⏭️ Mensaje propio, ya lo mostramos al enviar');
+                }
+            });
+        }
+
+        function showChatInterface() {
+            document.getElementById('mainContent').classList.add('hidden');
+            const chatInterface = document.getElementById('chatInterface');
+            chatInterface.style.display = 'block';
+            chatInterface.classList.remove('hidden');
+            document.getElementById('messageInput').focus();
+            
+            document.getElementById('chatTitle').textContent = `Chat Privado - ${currentChannelCode}`;
+            document.getElementById('channelInfo').textContent = `Canal: ${currentChannelId}`;
+        }
+
+        function disconnectChat() {
+            if (pusher) {
+                pusher.disconnect();
+            }
+            const chatInterface = document.getElementById('chatInterface');
+            chatInterface.style.display = 'none';
+            chatInterface.classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            updateStatus(false, 'Desconectado');
+        }
+
+        function resetForm() {
+            document.getElementById('channelCreated').classList.add('hidden');
+            document.getElementById('channelJoined').classList.add('hidden');
+            document.getElementById('setupForm').classList.remove('hidden');
+            currentChannelId = '';
+            currentChannelCode = '';
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const text = messageInput.value.trim();
+
+            if (!text || !isConnected) {
+                console.log('⚠️ No se puede enviar: texto vacío o no conectado');
+                return;
+            }
+
+            const messageData = {
+                text: text,
+                user_id: currentUser,
+                user_name: currentUser
+            };
+
+            console.log('📤 Enviando mensaje:', messageData);
+
+            // Send to server
+            try {
+                const response = await fetch(`${API_URL}/send-message`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        channel: currentChannelId,
+                        event: 'chat-message',
+                        data: messageData,
+                        user_id: currentUser,
+                        user_name: currentUser
+                    })
+                });
+
+                const data = await response.json();
+                console.log('📬 Respuesta del servidor:', data);
+
+                if (data.success) {
+                    console.log('✅ Mensaje enviado exitosamente');
+                    // Add message to UI immediately
+                    addMessage({
+                        ...messageData,
+                        timestamp: new Date().toISOString()
+                    }, true);
+                    messageInput.value = '';
+                } else {
+                    console.error('❌ Error del servidor:', data.error);
+                    showError('Error al enviar mensaje: ' + data.error);
+                }
+            } catch (error) {
+                console.error('❌ Error al enviar mensaje:', error);
+                showError('Error al enviar mensaje');
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>
