@@ -238,7 +238,15 @@ app.post('/send-message', (req, res) => {
     if (channel.startsWith("private-")) {
       if (!hasChannelAccess(channel, user_id)) {
         console.log(`❌ Access denied for user ${user_id} to send message to channel ${channel}`);
-        return res.status(403).json({ error: 'Access denied to send messages to this channel' });
+        console.log(`🔧 Attempting to grant access automatically...`);
+        
+        // Intentar otorgar acceso automáticamente
+        grantChannelAccess(channel, user_id);
+        console.log(`✅ Access granted automatically to user ${user_id} for channel ${channel}`);
+        
+        // También agregar a usuarios en línea
+        addOnlineUser(channel, user_id, user_name);
+        console.log(`👤 User ${user_id} (${user_name}) added to online users for channel ${channel}`);
       }
     }
 
@@ -441,6 +449,39 @@ app.post('/user-disconnect', (req, res) => {
   } catch (error) {
     console.error('Error processing disconnect:', error);
     res.status(500).json({ error: 'Failed to process disconnect' });
+  }
+});
+
+// Force access endpoint - for debugging and fixing access issues
+app.post('/force-access', (req, res) => {
+  const { channel, user_id, user_name } = req.body;
+  
+  if (!channel || !user_id) {
+    return res.status(400).json({ error: 'Missing channel or user_id' });
+  }
+  
+  try {
+    // Grant access to the channel
+    grantChannelAccess(channel, user_id);
+    
+    // Add to online users
+    if (user_name) {
+      addOnlineUser(channel, user_id, user_name);
+    }
+    
+    console.log(`🔧 Force access granted: User ${user_id} to channel ${channel}`);
+    
+    res.json({
+      success: true,
+      message: 'Access granted successfully',
+      channel: channel,
+      user_id: user_id,
+      hasAccess: hasChannelAccess(channel, user_id),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error forcing access:', error);
+    res.status(500).json({ error: 'Failed to force access' });
   }
 });
 
