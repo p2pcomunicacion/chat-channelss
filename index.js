@@ -65,18 +65,18 @@ function getOnlineUsers(channelName) {
 app.use(cors());
 app.use(express.json());
 
-// Validate environment variables
+// Validar variables de entorno
 if (!process.env.PUSHER_APP_ID || !process.env.PUSHER_KEY || !process.env.PUSHER_SECRET || !process.env.PUSHER_CLUSTER) {
-  console.error('❌ ERROR: Pusher environment variables are not configured!');
-  console.error('Missing variables:');
+  console.error('❌ ERROR: Las variables de entorno de Pusher no están configuradas!');
+  console.error('Variables faltantes:');
   if (!process.env.PUSHER_APP_ID) console.error('  - PUSHER_APP_ID');
   if (!process.env.PUSHER_KEY) console.error('  - PUSHER_KEY');
   if (!process.env.PUSHER_SECRET) console.error('  - PUSHER_SECRET');
   if (!process.env.PUSHER_CLUSTER) console.error('  - PUSHER_CLUSTER');
-  console.error('\n⚠️  Please configure environment variables in Vercel Dashboard or .env file');
+  console.error('\n⚠️  Por favor configura las variables de entorno en el Dashboard de Vercel o archivo .env');
 }
 
-// Initialize Pusher
+// Inicializar Pusher
 const pusher = new Pusher({
   appId: process.env.PUSHER_APP_ID,
   key: process.env.PUSHER_KEY,
@@ -85,19 +85,19 @@ const pusher = new Pusher({
   useTLS: true,
 });
 
-// Create private channel endpoint
+// Endpoint para crear canal privado
 app.post('/create-channel', (req, res) => {
   const { user_id, user_name } = req.body;
 
   if (!user_id || !user_name) {
-    return res.status(400).json({ error: 'Missing user_id or user_name' });
+    return res.status(400).json({ error: 'Faltan user_id o user_name' });
   }
 
   try {
     const channelCode = generateChannelCode();
     const channelId = generateChannelId();
     
-    // Store channel info
+    // Almacenar información del canal
     channelCodes.set(channelCode, {
       channelId: channelId,
       creatorId: user_id,
@@ -106,58 +106,69 @@ app.post('/create-channel', (req, res) => {
       members: [user_id]
     });
 
-    // Grant access to creator
+    // Otorgar acceso al creador
     grantChannelAccess(channelId, user_id);
+
+    console.log(`✅ Canal creado: ${channelCode} por usuario ${user_id} (${user_name})`);
 
     res.json({
       success: true,
       channelCode: channelCode,
       channelId: channelId,
-      message: 'Channel created successfully'
+      message: 'Canal creado exitosamente'
     });
   } catch (error) {
-    console.error('Error creating channel:', error);
-    res.status(500).json({ error: 'Failed to create channel' });
+    console.error('❌ Error al crear canal:', error);
+    res.status(500).json({ error: 'Error al crear el canal' });
   }
 });
 
-// Join channel with code endpoint
+// Endpoint para unirse a canal con código
 app.post('/join-channel', (req, res) => {
   const { channelCode, user_id, user_name } = req.body;
 
+  console.log('🔗 Solicitud de unión a canal:', { channelCode, user_id, user_name });
+
   if (!channelCode || !user_id || !user_name) {
-    return res.status(400).json({ error: 'Missing channelCode, user_id or user_name' });
+    console.error('❌ Faltan parámetros requeridos para unirse al canal');
+    return res.status(400).json({ error: 'Faltan channelCode, user_id o user_name' });
   }
 
   try {
     const channelInfo = channelCodes.get(channelCode);
     
     if (!channelInfo) {
-      return res.status(404).json({ error: 'Invalid channel code' });
+      console.error(`❌ Código de canal ${channelCode} no encontrado`);
+      console.log('Códigos de canal disponibles:', Array.from(channelCodes.keys()));
+      return res.status(404).json({ error: 'Código de canal inválido' });
     }
 
-    // Grant access to new user
+    console.log(`✅ Información del canal encontrada para código ${channelCode}:`, channelInfo);
+
+    // Otorgar acceso al nuevo usuario
     grantChannelAccess(channelInfo.channelId, user_id);
     
-    // Add to members list
+    // Agregar a la lista de miembros
     if (!channelInfo.members.includes(user_id)) {
       channelInfo.members.push(user_id);
     }
+
+    console.log(`👤 Usuario ${user_id} (${user_name}) se unió al canal ${channelInfo.channelId}`);
 
     res.json({
       success: true,
       channelId: channelInfo.channelId,
       creatorName: channelInfo.creatorName,
       members: channelInfo.members,
-      message: 'Successfully joined channel'
+      message: 'Se unió al canal exitosamente'
     });
   } catch (error) {
-    console.error('Error joining channel:', error);
-    res.status(500).json({ error: 'Failed to join channel' });
+    console.error('❌ Error al unirse al canal:', error);
+    res.status(500).json({ error: 'Error al unirse al canal' });
   }
 });
 
-// Get channel info by code
+// Obtener información del canal por código
 app.get('/channel-info/:code', (req, res) => {
   const { code } = req.params;
 
@@ -165,7 +176,7 @@ app.get('/channel-info/:code', (req, res) => {
     const channelInfo = channelCodes.get(code);
     
     if (!channelInfo) {
-      return res.status(404).json({ error: 'Channel not found' });
+      return res.status(404).json({ error: 'Canal no encontrado' });
     }
 
     res.json({
@@ -176,156 +187,165 @@ app.get('/channel-info/:code', (req, res) => {
       createdAt: channelInfo.createdAt
     });
   } catch (error) {
-    console.error('Error getting channel info:', error);
-    res.status(500).json({ error: 'Failed to get channel info' });
+    console.error('❌ Error al obtener información del canal:', error);
+    res.status(500).json({ error: 'Error al obtener información del canal' });
   }
 });
 
-// Pusher authentication endpoint
+// Endpoint de autenticación de Pusher
 app.post('/pusher/auth', (req, res) => {
   const { socket_id, channel_name, user_id, user_name } = req.body || {};
 
-  // Debug logging
-  console.log('📡 Auth request:', { socket_id, channel_name, user_id, user_name });
+  // Logging de debug
+  console.log('📡 Solicitud de autenticación:', { socket_id, channel_name, user_id, user_name });
 
   try {
-    // Check if Pusher is configured
+    // Verificar si Pusher está configurado
     if (!process.env.PUSHER_APP_ID || !process.env.PUSHER_SECRET) {
-      console.error('❌ Pusher not configured - missing environment variables');
-      console.error('Available env vars:', {
+      console.error('❌ Pusher no configurado - faltan variables de entorno');
+      console.error('Variables de entorno disponibles:', {
         PUSHER_APP_ID: !!process.env.PUSHER_APP_ID,
         PUSHER_KEY: !!process.env.PUSHER_KEY,
         PUSHER_SECRET: !!process.env.PUSHER_SECRET,
         PUSHER_CLUSTER: !!process.env.PUSHER_CLUSTER
       });
       return res.status(500).json({ 
-        error: 'Server configuration error',
-        message: 'Pusher credentials not configured. Please set PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, and PUSHER_CLUSTER environment variables.'
+        error: 'Error de configuración del servidor',
+        message: 'Credenciales de Pusher no configuradas. Por favor configura las variables de entorno PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET y PUSHER_CLUSTER.'
       });
     }
 
-    // Validate required parameters
+    // Validar parámetros requeridos
     if (!socket_id || !channel_name) {
-      console.error('❌ Missing required parameters:', { socket_id, channel_name });
+      console.error('❌ Faltan parámetros requeridos:', { socket_id, channel_name });
       return res.status(400).json({ 
-        error: 'Missing required parameters',
-        message: 'socket_id and channel_name are required'
+        error: 'Faltan parámetros requeridos',
+        message: 'socket_id y channel_name son requeridos'
       });
     }
 
-    // Validate access for private channels
+    // Validar acceso para canales privados
     if (channel_name.startsWith("private-")) {
+      // Para canales privados, necesitamos user_id
+      if (!user_id) {
+        console.error('❌ Falta user_id para autenticación de canal privado');
+        return res.status(400).json({ 
+          error: 'Falta user_id',
+          message: 'user_id es requerido para autenticación de canal privado'
+        });
+      }
+
       if (!hasChannelAccess(channel_name, user_id)) {
-        console.log(`❌ Access denied for user ${user_id} to channel ${channel_name}`);
-        return res.status(403).json({ error: 'Access denied to this channel' });
+        console.log(`❌ Acceso denegado para usuario ${user_id} al canal ${channel_name}`);
+        return res.status(403).json({ error: 'Acceso denegado a este canal' });
       }
       
-      // Add user to online users when they authenticate
+      // Agregar usuario a usuarios en línea cuando se autentica
       addOnlineUser(channel_name, user_id, user_name);
-      console.log(`👤 User ${user_id} (${user_name}) is now online in channel ${channel_name}`);
+      console.log(`👤 Usuario ${user_id} (${user_name}) ahora está en línea en el canal ${channel_name}`);
     }
 
-    // Authenticate for private channels
-    console.log('🔄 Attempting Pusher authentication...');
+    // Autenticar para canales privados
+    console.log('🔄 Intentando autenticación de Pusher...');
     const auth = pusher.authenticate(socket_id, channel_name);
-    console.log('✅ Auth successful for private channel');
+    console.log('✅ Autenticación exitosa para canal privado');
     return res.status(200).json(auth);
   } catch (error) {
-    console.error('❌ Pusher authentication error:', error);
-    console.error('Error details:', error.message);
+    console.error('❌ Error de autenticación de Pusher:', error);
+    console.error('Detalles del error:', error.message);
     console.error('Stack trace:', error.stack);
     
-    // More detailed error logging
-    console.error('Request body:', req.body);
-    console.error('Environment check:', {
+    // Logging de error más detallado
+    console.error('Cuerpo de la solicitud:', req.body);
+    console.error('Verificación de entorno:', {
       PUSHER_APP_ID: process.env.PUSHER_APP_ID,
       PUSHER_KEY: process.env.PUSHER_KEY,
-      PUSHER_SECRET: process.env.PUSHER_SECRET ? '***hidden***' : 'NOT_SET',
+      PUSHER_SECRET: process.env.PUSHER_SECRET ? '***oculto***' : 'NO_CONFIGURADO',
       PUSHER_CLUSTER: process.env.PUSHER_CLUSTER
     });
     
     return res.status(500).json({ 
-      error: 'Authentication failed',
+      error: 'Error de autenticación',
       message: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
 
-// Send message endpoint
+// Endpoint para enviar mensaje
 app.post('/send-message', (req, res) => {
   const { channel, event, data, user_id, user_name } = req.body;
 
   if (!channel || !event || !data) {
-    return res.status(400).json({ error: 'Missing required fields: channel, event, data' });
+    return res.status(400).json({ error: 'Faltan campos requeridos: channel, event, data' });
   }
 
   try {
     // Verificar acceso al canal para canales privados
     if (channel.startsWith("private-")) {
       if (!hasChannelAccess(channel, user_id)) {
-        console.log(`❌ Access denied for user ${user_id} to send message to channel ${channel}`);
-        return res.status(403).json({ error: 'Access denied to send messages to this channel' });
+        console.log(`❌ Acceso denegado para usuario ${user_id} para enviar mensaje al canal ${channel}`);
+        return res.status(403).json({ error: 'Acceso denegado para enviar mensajes a este canal' });
       }
     }
 
     const messageData = {
       ...data,
-      from: user_id || 'anonymous', // Flutter espera 'from'
+      from: user_id || 'anónimo', // Flutter espera 'from'
       ts: new Date().toISOString(), // Flutter espera 'ts'
-      id: Date.now() + Math.random(), // Simple unique ID
-      user_id: user_id || 'anonymous', // Mantener para compatibilidad
-      user_name: user_name || 'Anonymous',
+      id: Date.now() + Math.random(), // ID único simple
+      user_id: user_id || 'anónimo', // Mantener para compatibilidad
+      user_name: user_name || 'Anónimo',
       timestamp: new Date().toISOString()
     };
 
-    // Store message in history
+    // Almacenar mensaje en historial
     if (!messageHistory.has(channel)) {
       messageHistory.set(channel, []);
     }
     messageHistory.get(channel).push(messageData);
 
-    // Keep only last 100 messages per channel
+    // Mantener solo los últimos 100 mensajes por canal
     const channelMessages = messageHistory.get(channel);
     if (channelMessages.length > 100) {
       channelMessages.splice(0, channelMessages.length - 100);
     }
 
-    // Broadcast message to all subscribers of the channel
-    console.log(`📤 Broadcasting message to channel ${channel}`);
-    console.log(`📤 Event: ${event}`);
-    console.log(`📤 Message data:`, JSON.stringify(messageData, null, 2));
-    console.log(`📤 User ID: ${user_id}`);
-    console.log(`📤 User Name: ${user_name}`);
+    // Transmitir mensaje a todos los suscriptores del canal
+    console.log(`📤 Transmitiendo mensaje al canal ${channel}`);
+    console.log(`📤 Evento: ${event}`);
+    console.log(`📤 Datos del mensaje:`, JSON.stringify(messageData, null, 2));
+    console.log(`📤 ID de Usuario: ${user_id}`);
+    console.log(`📤 Nombre de Usuario: ${user_name}`);
     
     // Verificar que el canal existe y tiene suscriptores
     pusher.get({ path: `/channels/${channel}` }, (error, request, response) => {
       if (error) {
-        console.error(`❌ Error getting channel info for ${channel}:`, error);
+        console.error(`❌ Error al obtener información del canal ${channel}:`, error);
       } else {
-        console.log(`📊 Channel ${channel} info:`, JSON.stringify(response.body, null, 2));
+        console.log(`📊 Información del canal ${channel}:`, JSON.stringify(response.body, null, 2));
         const subscriberCount = response.body?.subscription_count || 0;
-        console.log(`👥 Subscribers in channel ${channel}: ${subscriberCount}`);
+        console.log(`👥 Suscriptores en el canal ${channel}: ${subscriberCount}`);
       }
     });
     
     pusher.trigger(channel, event, messageData);
     
-    console.log(`📤 Message sent to channel ${channel} by user ${user_id}`);
+    console.log(`📤 Mensaje enviado al canal ${channel} por usuario ${user_id}`);
 
     res.json({ 
       success: true, 
-      message: 'Message sent successfully',
+      message: 'Mensaje enviado exitosamente',
       messageId: messageData.id,
       timestamp: messageData.timestamp
     });
   } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ error: 'Failed to send message' });
+    console.error('❌ Error al enviar mensaje:', error);
+    res.status(500).json({ error: 'Error al enviar mensaje' });
   }
 });
 
-// Get message history endpoint
+// Endpoint para obtener historial de mensajes
 app.get('/messages/:channelName', (req, res) => {
   const { channelName } = req.params;
   const { limit = 50 } = req.query;
@@ -341,20 +361,20 @@ app.get('/messages/:channelName', (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error getting message history:', error);
-    res.status(500).json({ error: 'Failed to get message history' });
+    console.error('❌ Error al obtener historial de mensajes:', error);
+    res.status(500).json({ error: 'Error al obtener historial de mensajes' });
   }
 });
 
-// Get channel info endpoint
+// Endpoint para obtener información del canal
 app.get('/channel/:channelName', (req, res) => {
   const { channelName } = req.params;
   
   try {
-    // Get channel info from Pusher
+    // Obtener información del canal desde Pusher
     pusher.get({ path: `/channels/${channelName}` }, (error, request, response) => {
       if (error) {
-        return res.status(500).json({ error: 'Failed to get channel info' });
+        return res.status(500).json({ error: 'Error al obtener información del canal' });
       }
       
       res.json({
@@ -364,12 +384,12 @@ app.get('/channel/:channelName', (req, res) => {
       });
     });
   } catch (error) {
-    console.error('Error getting channel info:', error);
-    res.status(500).json({ error: 'Failed to get channel info' });
+    console.error('❌ Error al obtener información del canal:', error);
+    res.status(500).json({ error: 'Error al obtener información del canal' });
   }
 });
 
-// Pusher webhook endpoint (OPCIONAL - para notificaciones del servidor)
+// Endpoint de webhook de Pusher (OPCIONAL - para notificaciones del servidor)
 app.post('/pusher/webhook', (req, res) => {
   const webhook = req.body;
   
@@ -384,8 +404,8 @@ app.post('/pusher/webhook', (req, res) => {
     .digest('hex');
   
   if (receivedSignature !== expectedSignature) {
-    console.error('❌ Webhook signature inválida');
-    return res.status(401).json({ error: 'Invalid signature' });
+    console.error('❌ Firma de webhook inválida');
+    return res.status(401).json({ error: 'Firma inválida' });
   }
   
   // Procesar eventos
@@ -417,7 +437,7 @@ app.post('/pusher/webhook', (req, res) => {
   res.status(200).json({ received: true });
 });
 
-// Get online users endpoint
+// Endpoint para obtener usuarios en línea
 app.get('/online-users/:channelName', (req, res) => {
   const { channelName } = req.params;
   
@@ -431,47 +451,47 @@ app.get('/online-users/:channelName', (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error getting online users:', error);
-    res.status(500).json({ error: 'Failed to get online users' });
+    console.error('❌ Error al obtener usuarios en línea:', error);
+    res.status(500).json({ error: 'Error al obtener usuarios en línea' });
   }
 });
 
-// User heartbeat endpoint (to keep users online)
+// Endpoint de latido del usuario (para mantener usuarios en línea)
 app.post('/user-heartbeat', (req, res) => {
   const { channel, user_id, user_name } = req.body;
   
   if (!channel || !user_id) {
-    return res.status(400).json({ error: 'Missing channel or user_id' });
+    return res.status(400).json({ error: 'Falta canal o user_id' });
   }
   
   try {
     addOnlineUser(channel, user_id, user_name);
-    res.json({ success: true, message: 'Heartbeat received' });
+    res.json({ success: true, message: 'Latido recibido' });
   } catch (error) {
-    console.error('Error processing heartbeat:', error);
-    res.status(500).json({ error: 'Failed to process heartbeat' });
+    console.error('❌ Error al procesar latido:', error);
+    res.status(500).json({ error: 'Error al procesar latido' });
   }
 });
 
-// User disconnect endpoint
+// Endpoint de desconexión de usuario
 app.post('/user-disconnect', (req, res) => {
   const { channel, user_id } = req.body;
   
   if (!channel || !user_id) {
-    return res.status(400).json({ error: 'Missing channel or user_id' });
+    return res.status(400).json({ error: 'Falta canal o user_id' });
   }
   
   try {
     removeOnlineUser(channel, user_id);
-    console.log(`👋 User ${user_id} disconnected from channel ${channel}`);
-    res.json({ success: true, message: 'User disconnected' });
+    console.log(`👋 Usuario ${user_id} desconectado del canal ${channel}`);
+    res.json({ success: true, message: 'Usuario desconectado' });
   } catch (error) {
-    console.error('Error processing disconnect:', error);
-    res.status(500).json({ error: 'Failed to process disconnect' });
+    console.error('❌ Error al procesar desconexión:', error);
+    res.status(500).json({ error: 'Error al procesar desconexión' });
   }
 });
 
-// Debug endpoint to check channel status
+// Endpoint de debug para verificar estado del canal
 app.get('/debug/channel/:channelName', (req, res) => {
   const { channelName } = req.params;
   
@@ -479,7 +499,7 @@ app.get('/debug/channel/:channelName', (req, res) => {
     pusher.get({ path: `/channels/${channelName}` }, (error, request, response) => {
       if (error) {
         return res.status(500).json({ 
-          error: 'Failed to get channel info',
+          error: 'Error al obtener información del canal',
           details: error.message 
         });
       }
@@ -498,12 +518,12 @@ app.get('/debug/channel/:channelName', (req, res) => {
       });
     });
   } catch (error) {
-    console.error('Error in debug endpoint:', error);
-    res.status(500).json({ error: 'Failed to get debug info' });
+    console.error('❌ Error en endpoint de debug:', error);
+    res.status(500).json({ error: 'Error al obtener información de debug' });
   }
 });
 
-// Health check endpoint
+// Endpoint de verificación de salud
 app.get('/health', (req, res) => {
   const envConfigured = !!(
     process.env.PUSHER_APP_ID && 
@@ -518,7 +538,7 @@ app.get('/health', (req, res) => {
     pusherConfigured: envConfigured,
     env: process.env.NODE_ENV || 'development',
     ...(envConfigured ? {} : {
-      warning: 'Pusher environment variables are not configured',
+      warning: 'Las variables de entorno de Pusher no están configuradas',
       missingVars: [
         !process.env.PUSHER_APP_ID && 'PUSHER_APP_ID',
         !process.env.PUSHER_KEY && 'PUSHER_KEY',
@@ -529,26 +549,45 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Debug endpoint for environment variables
+// Endpoint de debug para variables de entorno
 app.get('/debug/env', (req, res) => {
   res.json({
-    PUSHER_APP_ID: process.env.PUSHER_APP_ID || 'NOT_SET',
-    PUSHER_KEY: process.env.PUSHER_KEY || 'NOT_SET',
-    PUSHER_SECRET: process.env.PUSHER_SECRET ? '***hidden***' : 'NOT_SET',
-    PUSHER_CLUSTER: process.env.PUSHER_CLUSTER || 'NOT_SET',
+    PUSHER_APP_ID: process.env.PUSHER_APP_ID || 'NO_CONFIGURADO',
+    PUSHER_KEY: process.env.PUSHER_KEY || 'NO_CONFIGURADO',
+    PUSHER_SECRET: process.env.PUSHER_SECRET ? '***oculto***' : 'NO_CONFIGURADO',
+    PUSHER_CLUSTER: process.env.PUSHER_CLUSTER || 'NO_CONFIGURADO',
     NODE_ENV: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString()
   });
 });
 
-// Start server
+// Endpoint de debug para códigos de canal
+app.get('/debug/channels', (req, res) => {
+  const channels = Array.from(channelCodes.entries()).map(([code, info]) => ({
+    code,
+    channelId: info.channelId,
+    creatorId: info.creatorId,
+    creatorName: info.creatorName,
+    memberCount: info.members.length,
+    createdAt: info.createdAt
+  }));
+
+  res.json({
+    success: true,
+    totalChannels: channels.length,
+    channels: channels,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Iniciar servidor
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-  console.log(`Pusher auth endpoint: http://localhost:${port}/pusher/auth`);
-  console.log(`Create channel endpoint: http://localhost:${port}/create-channel`);
-  console.log(`Join channel endpoint: http://localhost:${port}/join-channel`);
-  console.log(`Channel info endpoint: http://localhost:${port}/channel-info/:code`);
-  console.log(`Send message endpoint: http://localhost:${port}/send-message`);
-  console.log(`Message history endpoint: http://localhost:${port}/messages/:channelName`);
-  console.log(`Channel info endpoint: http://localhost:${port}/channel/:channelName`);
+  console.log(`🚀 Servidor ejecutándose en puerto ${port}`);
+  console.log(`🔐 Endpoint de autenticación Pusher: http://localhost:${port}/pusher/auth`);
+  console.log(`➕ Endpoint de crear canal: http://localhost:${port}/create-channel`);
+  console.log(`🔗 Endpoint de unirse a canal: http://localhost:${port}/join-channel`);
+  console.log(`ℹ️ Endpoint de información de canal: http://localhost:${port}/channel-info/:code`);
+  console.log(`📤 Endpoint de enviar mensaje: http://localhost:${port}/send-message`);
+  console.log(`📜 Endpoint de historial de mensajes: http://localhost:${port}/messages/:channelName`);
+  console.log(`📊 Endpoint de información de canal: http://localhost:${port}/channel/:channelName`);
 });

@@ -43,6 +43,26 @@
       "methods": ["GET"]
     },
     {
+      "src": "/online-users/(.*)",
+      "dest": "index.js",
+      "methods": ["GET"]
+    },
+    {
+      "src": "/user-heartbeat",
+      "dest": "index.js",
+      "methods": ["POST", "OPTIONS"]
+    },
+    {
+      "src": "/user-disconnect",
+      "dest": "index.js",
+      "methods": ["POST", "OPTIONS"]
+    },
+    {
+      "src": "/debug/(.*)",
+      "dest": "index.js",
+      "methods": ["GET"]
+    },
+    {
       "src": "/health",
       "dest": "index.js",
       "methods": ["GET"]
