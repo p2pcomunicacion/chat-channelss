@@ -192,16 +192,31 @@ app.post('/pusher/auth', (req, res) => {
     // Check if Pusher is configured
     if (!process.env.PUSHER_APP_ID || !process.env.PUSHER_SECRET) {
       console.error('❌ Pusher not configured - missing environment variables');
+      console.error('Available env vars:', {
+        PUSHER_APP_ID: !!process.env.PUSHER_APP_ID,
+        PUSHER_KEY: !!process.env.PUSHER_KEY,
+        PUSHER_SECRET: !!process.env.PUSHER_SECRET,
+        PUSHER_CLUSTER: !!process.env.PUSHER_CLUSTER
+      });
       return res.status(500).json({ 
         error: 'Server configuration error',
         message: 'Pusher credentials not configured. Please set PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, and PUSHER_CLUSTER environment variables.'
       });
     }
 
+    // Validate required parameters
+    if (!socket_id || !channel_name) {
+      console.error('❌ Missing required parameters:', { socket_id, channel_name });
+      return res.status(400).json({ 
+        error: 'Missing required parameters',
+        message: 'socket_id and channel_name are required'
+      });
+    }
+
     // Validate access for private channels
     if (channel_name.startsWith("private-")) {
       if (!hasChannelAccess(channel_name, user_id)) {
-        console.log(`Access denied for user ${user_id} to channel ${channel_name}`);
+        console.log(`❌ Access denied for user ${user_id} to channel ${channel_name}`);
         return res.status(403).json({ error: 'Access denied to this channel' });
       }
       
@@ -211,12 +226,24 @@ app.post('/pusher/auth', (req, res) => {
     }
 
     // Authenticate for private channels
+    console.log('🔄 Attempting Pusher authentication...');
     const auth = pusher.authenticate(socket_id, channel_name);
     console.log('✅ Auth successful for private channel');
     return res.status(200).json(auth);
   } catch (error) {
     console.error('❌ Pusher authentication error:', error);
-    console.error('Error details:', error.message, error.stack);
+    console.error('Error details:', error.message);
+    console.error('Stack trace:', error.stack);
+    
+    // More detailed error logging
+    console.error('Request body:', req.body);
+    console.error('Environment check:', {
+      PUSHER_APP_ID: process.env.PUSHER_APP_ID,
+      PUSHER_KEY: process.env.PUSHER_KEY,
+      PUSHER_SECRET: process.env.PUSHER_SECRET ? '***hidden***' : 'NOT_SET',
+      PUSHER_CLUSTER: process.env.PUSHER_CLUSTER
+    });
+    
     return res.status(500).json({ 
       error: 'Authentication failed',
       message: error.message,
@@ -477,7 +504,6 @@ app.get('/debug/channel/:channelName', (req, res) => {
 });
 
 // Health check endpoint
-
 app.get('/health', (req, res) => {
   const envConfigured = !!(
     process.env.PUSHER_APP_ID && 
@@ -500,6 +526,18 @@ app.get('/health', (req, res) => {
         !process.env.PUSHER_CLUSTER && 'PUSHER_CLUSTER'
       ].filter(Boolean)
     })
+  });
+});
+
+// Debug endpoint for environment variables
+app.get('/debug/env', (req, res) => {
+  res.json({
+    PUSHER_APP_ID: process.env.PUSHER_APP_ID || 'NOT_SET',
+    PUSHER_KEY: process.env.PUSHER_KEY || 'NOT_SET',
+    PUSHER_SECRET: process.env.PUSHER_SECRET ? '***hidden***' : 'NOT_SET',
+    PUSHER_CLUSTER: process.env.PUSHER_CLUSTER || 'NOT_SET',
+    NODE_ENV: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
   });
 });
 
